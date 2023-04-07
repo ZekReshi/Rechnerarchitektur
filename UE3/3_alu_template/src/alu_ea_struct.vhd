@@ -1,6 +1,77 @@
+-- COPIED FROM 1_adder_template
+library IEEE; use IEEE.STD_LOGIC_1164.all;
+entity cla_gen is
+  generic(width:integer);
+  port(a, b: in  std_ulogic_vector(width-1 downto 0);
+       cin:  in  std_ulogic;
+       sum:  out std_ulogic_vector(width downto 0));
+
+end;
+library IEEE; use IEEE.STD_LOGIC_1164.all;
+
+entity mux_gen is
+  generic(width: integer);
+  port(a, b: in  std_ulogic_vector(width-1 downto 0);
+  sel:  in  std_ulogic;
+  selected:  out std_ulogic_vector(width-1 downto 0));
+end;
+
+architecture behavioral of mux_gen is
+  begin
+    process (a,b,sel)
+    begin
+      if(sel ='0') then
+        selected <=a;
+      else
+        selected <=b;
+      end if;
+      end process;
+  end behavioral;
+
+architecture structural of cla_gen is
+  component cla_gen
+    generic(width:integer);
+      port(a, b: in  std_ulogic_vector(width-1 downto 0);
+        cin:  in  std_ulogic;
+        sum:  out std_ulogic_vector(width downto 0));
+  end component;
+  component mux_gen
+    generic(width: integer);
+    port(a, b: in  std_ulogic_vector(width-1 downto 0);
+    sel:  in  std_ulogic;
+    selected:  out std_ulogic_vector(width-1 downto 0));
+  end component;
+  constant old_width:integer := width;
+  signal sc: std_ulogic_vector(old_width/2 downto 0);
+  signal snc: std_ulogic_vector(old_width/2 downto 0);
+  signal sl: std_ulogic_vector(old_width/2 downto 0);
+begin
+    o1: if old_width > 1 generate 
+      cla_add_low:cla_gen generic map(width => old_width/2) port map(
+        a(old_width/2-1 downto 0),b(old_width/2-1 downto 0),cin,sl);
+      cla_add_high_carry: cla_gen generic map(width => old_width/2) port map(
+        a(old_width-1 downto old_width/2),b(old_width-1 downto old_width/2)
+        ,'1',sc);
+      cla_add_high_no_carry: cla_gen generic map(width => old_width/2) port map(
+        a(old_width-1 downto old_width/2),b(old_width-1 downto old_width/2)
+        ,'0',snc);
+        high_mux: mux_gen generic map(width => old_width/2+1) port map(    
+        snc,
+        sc,
+        sl(old_width/2),
+        sum(old_width downto old_width/2));
+        sum(old_width/2-1 downto 0) <=sl(old_width/2-1 downto 0);
+      else generate
+        sum(0) <= a(0) xor b(0) xor cin;
+        sum(1) <= (a(0) and b(0)) or (b(0) and cin) or (a(0) and cin);
+    end generate;
+    
+  end;
+-- END COPY
+
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
-
 
 entity mux is
   port(a, b:      in      std_ulogic_vector(31 downto 0);
@@ -55,10 +126,11 @@ entity alu is
 end;
 
 architecture structural of alu is
-  component adder
-    port(a, b:    in      std_ulogic_vector(31 downto 0);
-         cin:     in      std_ulogic;
-         s:       out     std_ulogic_vector(31 downto 0));
+  component cla_gen
+    generic(width:integer);
+      port(a, b:  in      std_ulogic_vector(width-1 downto 0);
+           cin:     in      std_ulogic;
+           sum:       out     std_ulogic_vector(width downto 0));
   end component;
   component mux
     port(a, b:    in      std_ulogic_vector(31 downto 0);
@@ -70,11 +142,13 @@ architecture structural of alu is
          r:       out     std_ulogic);
   end component;
   signal b_xored, and_result, or_result, adder_result, logic_result, adder_logic_result, expanded_msb, final_result: std_ulogic_vector(31 downto 0);
+  signal adder_result_untruncated: std_ulogic_vector(32 downto 0);
   signal logic_select, adder_logic_select, msb, final_select: std_ulogic;
 begin
   b_xored <= (b xor (31 downto 0 => mode(0)));
 
-  adder_result <= a;--add: adder port map(a, b_xored, mode(0), adder_result);
+  add: cla_gen generic map(width => 32) port map(a, b_xored, mode(0), adder_result_untruncated);
+  adder_result <= adder_result_untruncated(31 downto 0);
   and_result <= a and b_xored;
   or_result <= a or b_xored;
 
