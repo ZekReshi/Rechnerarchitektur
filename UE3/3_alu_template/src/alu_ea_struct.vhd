@@ -145,9 +145,9 @@ architecture structural of alu is
   signal adder_result_untruncated: std_ulogic_vector(32 downto 0);
   signal logic_select, adder_logic_select, msb, final_select: std_ulogic;
 begin
-  b_xored <= (b xor (31 downto 0 => mode(0)));
+  b_xored <= (b xor (31 downto 0 => mode(2)));
 
-  add: cla_gen generic map(width => 32) port map(a, b_xored, mode(0), adder_result_untruncated);
+  add: cla_gen generic map(width => 32) port map(a, b_xored, mode(2), adder_result_untruncated);
   adder_result <= adder_result_untruncated(31 downto 0);
   and_result <= a and b_xored;
   or_result <= a or b_xored;
@@ -155,13 +155,13 @@ begin
   logic_select <= mode(1);
   mux_logic: mux port map(and_result, or_result, logic_select, logic_result);
 
-  adder_logic_select <= mode(1) nor mode(2);
+  adder_logic_select <= mode(1) nor mode(0);
   mux_adder_logic: mux port map(logic_result, adder_result, adder_logic_select, adder_logic_result);
 
   msb <= adder_logic_result(31);
   expanded_msb <= (0 => msb, others => '0');
 
-  final_select <= mode(1) and mode(2);
+  final_select <= mode(1) and mode(0);
   mux_final: mux port map(adder_logic_result, expanded_msb, final_select, final_result);
 
   result <= final_result;
