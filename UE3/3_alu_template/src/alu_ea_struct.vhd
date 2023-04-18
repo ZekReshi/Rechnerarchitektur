@@ -16,17 +16,14 @@ entity mux_gen is
   selected:  out std_ulogic_vector(width-1 downto 0));
 end;
 
-architecture behavioral of mux_gen is
+architecture structural of mux_gen is
   begin
-    process (a,b,sel)
-    begin
-      if(sel ='0') then
-        selected <=a;
-      else
-        selected <=b;
-      end if;
-      end process;
-  end behavioral;
+    out_I: for I in 0 to width-1 generate
+      selected(I) <= 
+      ((not(sel)) and a(I) ) or (sel and b(I));
+
+    end generate;
+  end ;
 
 architecture structural of cla_gen is
   component cla_gen
@@ -118,14 +115,14 @@ end;
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 
-entity alu is
+entity ALU is
   port(a, b:      in      std_ulogic_vector(31 downto 0);
        mode:      in      std_ulogic_vector(2 downto 0);
        result:    buffer  std_ulogic_vector(31 downto 0);
        zero, neg: buffer  std_ulogic);
 end;
 
-architecture structural of alu is
+architecture structural of ALU is
   component cla_gen
     generic(width:integer);
       port(a, b:  in      std_ulogic_vector(width-1 downto 0);
