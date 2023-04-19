@@ -140,7 +140,7 @@ architecture structural of ALU is
   end component;
   signal b_xored, and_result, or_result, adder_result, logic_result, adder_logic_result, expanded_msb, final_result: std_ulogic_vector(31 downto 0);
   signal adder_result_untruncated: std_ulogic_vector(32 downto 0);
-  signal logic_select, adder_logic_select, msb, final_select: std_ulogic;
+  signal logic_select, adder_logic_select, msb_adder_logic, final_select, msb_final: std_ulogic;
 begin
   b_xored <= (b xor (31 downto 0 => mode(2)));
 
@@ -152,16 +152,17 @@ begin
   logic_select <= mode(1);
   mux_logic: mux port map(and_result, or_result, logic_select, logic_result);
 
-  adder_logic_select <= mode(1) nor mode(0);
-  mux_adder_logic: mux port map(logic_result, adder_result, adder_logic_select, adder_logic_result);
+  adder_logic_select <= mode(1) xor mode(0);
+  mux_adder_logic: mux port map(adder_result, logic_result, adder_logic_select, adder_logic_result);
 
-  msb <= adder_logic_result(31);
-  expanded_msb <= (0 => msb, others => '0');
+  msb_adder_logic <= adder_logic_result(31);
+  expanded_msb <= (0 => msb_adder_logic, others => '0');
 
   final_select <= mode(1) and mode(0);
   mux_final: mux port map(adder_logic_result, expanded_msb, final_select, final_result);
 
   result <= final_result;
-  neg <= msb;
+  msb_final <= final_result(31);
+  neg <= msb_final;
   n32: nor32 port map(result, zero);
 end;
