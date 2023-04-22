@@ -7,6 +7,15 @@ entity CSavA is
 end;
 
 architecture behav of CSavA is
+  component FA 
+    port(a,b,cin: in STD_ULOGIC;
+         cout,s: out STD_ULOGIC);
+  end component;
+  signal void: STD_ULOGIC;
 begin
-  --TODO
+  cout(0) <= '0';
+  ffas: for i in 0 to 30 generate
+    fa_i: FA port map(a(i), b(i), c(i), cout(i+1), s(i));
+  end generate;
+  fa_n: FA port map(a(31), b(31), c(31), void, s(31));
 end; 
