@@ -28,11 +28,14 @@ begin
     dA: cra generic map(width => width) port map(add_base,incr,'0',c_out,res);
     process(clk, reset)
     begin
-        if clk'event and clk = '0' then
+        if reset'event and reset ='1' then
+            qq <=(width -1 downto 0 => '0');
+        
+        elsif clk'event and clk = '0' then
             if reset = '0' then
                 qq <=res;
             end if;
-            if c_out = '1' or reset ='1' then
+            if c_out = '1' then
                 qq <=(width -1 downto 0 => '0');
             end if;
         end if;
