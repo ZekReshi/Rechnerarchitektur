@@ -124,7 +124,8 @@ architecture struct of riscvsingle is
        PCSrc, ALUSrc:  out    STD_ULOGIC;
        RegWrite:       out    STD_ULOGIC;
        Jump:           out    STD_ULOGIC;
-       ImmSrc:         out    STD_ULOGIC_VECTOR(1 downto 0);
+       JmpSrc:         out    STD_ULOGIC;
+       ImmSrc:         out    STD_ULOGIC_VECTOR(2 downto 0);
        ALUControl:     out    STD_ULOGIC_VECTOR(2 downto 0));
   end component;
   component datapath
@@ -132,7 +133,8 @@ architecture struct of riscvsingle is
          ResultSrc:            in     STD_ULOGIC_VECTOR(1  downto 0);
          PCSrc, ALUSrc:        in     STD_ULOGIC;
          RegWrite:             in     STD_ULOGIC;
-         ImmSrc:               in     STD_ULOGIC_VECTOR(1  downto 0);
+         ImmSrc:               in     STD_ULOGIC_VECTOR(2  downto 0);
+         JmpSrc:               in     STD_ULOGIC;
          ALUControl:           in     STD_ULOGIC_VECTOR(2  downto 0);
          Zero:                 out    STD_ULOGIC;
          Neg:                  out    STD_ULOGIC;
@@ -142,16 +144,17 @@ architecture struct of riscvsingle is
          ReadData:             in     STD_ULOGIC_VECTOR(31 downto 0));
   end component;
     
-  signal ALUSrc, RegWrite, Jump, Zero, Neg,PCSrc: STD_ULOGIC;
-  signal ResultSrc, ImmSrc: STD_ULOGIC_VECTOR(1 downto 0);
+  signal ALUSrc, RegWrite, Jump, JmpSrc, Zero, Neg,PCSrc: STD_ULOGIC;
+  signal ResultSrc: STD_ULOGIC_VECTOR(1 downto 0);
+  signal ImmSrc: STD_ULOGIC_VECTOR(2 downto 0);
   signal ALUControl: STD_ULOGIC_VECTOR(2 downto 0);
 begin
   c: controller port map(Instr(6 downto 0), Instr(14 downto 12),
                          Instr(30), Zero, Neg, ResultSrc, MemWrite,
-                         PCSrc, ALUSrc, RegWrite, Jump,
+                         PCSrc, ALUSrc, RegWrite, Jump, JmpSrc,
                          ImmSrc, ALUControl);
   dp: datapath port map(clk, reset, ResultSrc, PCSrc, ALUSrc, 
-                        RegWrite, ImmSrc, ALUControl, Zero, Neg,
+                        RegWrite, ImmSrc, JmpSrc, ALUControl, Zero, Neg,
                         PC, Instr, ALUResult,  WriteData, 
                         ReadData);
 
@@ -169,7 +172,8 @@ entity controller is -- single-cycle controller
        PCSrc, ALUSrc:  out    STD_ULOGIC;
        RegWrite:       out    STD_ULOGIC;
        Jump:           out    STD_ULOGIC;
-       ImmSrc:         out    STD_ULOGIC_VECTOR(1 downto 0);
+       JmpSrc:         out    STD_ULOGIC;
+       ImmSrc:         out    STD_ULOGIC_VECTOR(2 downto 0);
        ALUControl:     out    STD_ULOGIC_VECTOR(2 downto 0));
 end;
 
@@ -180,7 +184,8 @@ architecture struct of controller is
          MemWrite:       out STD_ULOGIC;
          Branch, ALUSrc: out STD_ULOGIC;
          RegWrite, Jump: out STD_ULOGIC;
-         ImmSrc:         out STD_ULOGIC_VECTOR(1 downto 0);
+         JmpSrc:         out STD_ULOGIC;
+         ImmSrc:         out STD_ULOGIC_VECTOR(2 downto 0);
          ALUOp:          out STD_ULOGIC_VECTOR(1 downto 0));
   end component;
   component aludec
@@ -196,7 +201,7 @@ architecture struct of controller is
   signal Branch_Type: STD_ULOGIC;
 begin
   md: maindec port map(op, ResultSrc, MemWrite, Branch,
-                       ALUSrc, RegWrite, Jump_s, ImmSrc, ALUOp);
+                       ALUSrc, RegWrite, Jump_s, JmpSrc, ImmSrc, ALUOp);
   ad: aludec port map(op(5), funct3, funct7b5, ALUOp, ALUControl);
   Branch_Type <= (not(funct3(2)) and Zero) or (funct3(2) and Neg);
   PCSrc <= (Branch and Branch_Type) or Jump_s; 
@@ -212,27 +217,30 @@ entity maindec is -- main control decoder
        MemWrite:       out STD_ULOGIC;
        Branch, ALUSrc: out STD_ULOGIC;
        RegWrite, Jump: out STD_ULOGIC;
-       ImmSrc:         out STD_ULOGIC_VECTOR(1 downto 0);
+       JmpSrc:         out STD_ULOGIC;
+       ImmSrc:         out STD_ULOGIC_VECTOR(2 downto 0);
        ALUOp:          out STD_ULOGIC_VECTOR(1 downto 0));
 end;
 
 architecture behave of maindec is
-  signal controls: STD_ULOGIC_VECTOR(10 downto 0);
+  signal controls: STD_ULOGIC_VECTOR(12 downto 0);
 begin
   process(op) begin
     case op is
-      when "0000011" => controls <= "10010010000"; -- lw
-      when "0100011" => controls <= "00111000000"; -- sw
-      when "0110011" => controls <= "1--00000100"; -- R-type
-      when "1100011" => controls <= "01000001010"; -- beq
-      when "0010011" => controls <= "10010000100"; -- I-type ALU
-      when "1101111" => controls <= "11100100001"; -- jal
-      when others    => controls <= "-----------"; -- not valid
+      when "0000011" => controls <= "1000100100000"; -- lw
+      when "0100011" => controls <= "0001110000000"; -- sw
+      when "0110011" => controls <= "1---000001000"; -- R-type
+      when "1100011" => controls <= "0010000010100"; -- beq
+      when "0010011" => controls <= "1000100001000"; -- I-type ALU
+      when "1101111" => controls <= "1011001000010"; -- jal
+      when "1100111" => controls <= "1000001000011"; -- jalr
+      when "0010111" => controls <= "1100001100000"; -- auipc
+      when others    => controls <= "-------------"; -- not valid
     end case;
   end process;
 
-  (RegWrite, ImmSrc(1), ImmSrc(0), ALUSrc, MemWrite,
-   ResultSrc(1), ResultSrc(0), Branch, ALUOp(1), ALUOp(0), Jump) <= controls;
+  (RegWrite, ImmSrc(2), ImmSrc(1), ImmSrc(0), ALUSrc, MemWrite,
+   ResultSrc(1), ResultSrc(0), Branch, ALUOp(1), ALUOp(0), Jump, JmpSrc) <= controls;
 end;
 
 library IEEE;
@@ -278,7 +286,8 @@ entity datapath is -- RISC-V datapath
        ResultSrc:            in     STD_ULOGIC_VECTOR(1  downto 0);
        PCSrc, ALUSrc:        in     STD_ULOGIC;
        RegWrite:             in     STD_ULOGIC;
-       ImmSrc:               in     STD_ULOGIC_VECTOR(1  downto 0);
+       ImmSrc:               in     STD_ULOGIC_VECTOR(2  downto 0);
+       JmpSrc:               in     STD_ULOGIC;
        ALUControl:           in     STD_ULOGIC_VECTOR(2  downto 0);
        Zero:                 out    STD_ULOGIC;
        Neg :                 out    STD_ULOGIC;
@@ -303,8 +312,8 @@ architecture struct of datapath is
          s:      in  STD_ULOGIC;
          y:      out STD_ULOGIC_VECTOR(width-1 downto 0));
   end component;
-  component mux3 generic(width: integer);
-    port(d0, d1, d2: in  STD_ULOGIC_VECTOR(width-1 downto 0);
+  component mux4 generic(width: integer);
+    port(d0, d1, d2, d3: in  STD_ULOGIC_VECTOR(width-1 downto 0);
          s:          in  STD_ULOGIC_VECTOR(1 downto 0);
          y:          out STD_ULOGIC_VECTOR(width-1 downto 0));
   end component;
@@ -317,7 +326,7 @@ architecture struct of datapath is
   end component;
   component extend
     port(instr:  in  STD_ULOGIC_VECTOR(31 downto 7);
-         immsrc: in  STD_ULOGIC_VECTOR(1  downto 0);
+         immsrc: in  STD_ULOGIC_VECTOR(2  downto 0);
          immext: out STD_ULOGIC_VECTOR(31 downto 0));
   end component;
   component alu
@@ -329,7 +338,7 @@ architecture struct of datapath is
   end component;
     
   signal PCNext, PCPlus4, PCTarget: STD_ULOGIC_VECTOR(31 downto 0);
-  signal ImmExt:                    STD_ULOGIC_VECTOR(31 downto 0);
+  signal PCTargetIn, ImmExt:        STD_ULOGIC_VECTOR(31 downto 0);
   signal SrcA, SrcB:                STD_ULOGIC_VECTOR(31 downto 0);
   signal Result:                    STD_ULOGIC_VECTOR(31 downto 0);
   signal PC_s, WriteData_s, ALUResult_s : STD_ULOGIC_VECTOR(31 downto 0);
@@ -337,7 +346,8 @@ begin
   -- next PC logic
   pcreg: flopr generic map(32) port map(clk, reset, PCNext, PC_s);
   pcadd4: adder port map(PC_s, X"00000004", PCPlus4);
-  pcaddbranch: adder port map(PC_s, ImmExt, PCTarget);
+  jmpsrcmux: mux2 generic map(32) port map(PC_s, SrcA, JmpSrc, PCTargetIn);
+  pcaddbranch: adder port map(PCTargetIn, ImmExt, PCTarget);
   pcmux: mux2 generic map(32) port map(PCPlus4, PCTarget, PCSrc, PCNext);
 
   PC <= PC_s;
@@ -350,7 +360,7 @@ begin
   -- ALU logic
   srcbmux: mux2 generic map(32) port map(WriteData_s, ImmExt, ALUSrc, SrcB);
   mainalu: alu port map(SrcA, SrcB,ALUControl, ALUResult_s, Zero,Neg);
-  resultmux: mux3 generic map(32) port map(ALUResult_s, ReadData, PCPlus4, ResultSrc,
+  resultmux: mux4 generic map(32) port map(ALUResult_s, ReadData, PCPlus4, PCTarget, ResultSrc,
                                            Result);
 
   ALUResult <= ALUResult_s;
@@ -414,7 +424,7 @@ use IEEE.STD_LOGIC_1164.all;
 
 entity extend is -- extend unit
   port(instr:  in  STD_ULOGIC_VECTOR(31 downto 7); -- TODO
-    immsrc: in  STD_ULOGIC_VECTOR(1  downto 0);
+    immsrc: in  STD_ULOGIC_VECTOR(2  downto 0);
     immext: out STD_ULOGIC_VECTOR(31 downto 0));
 end;
     
@@ -423,17 +433,20 @@ begin
   process(instr, immsrc) begin -- TODO
     case immsrc is
       -- I-type
-      when "00" =>
+      when "000" =>
         immext <= (31 downto 12 => instr(31)) & instr(31 downto 20);
       -- S-types (stores)
-      when "01" =>
+      when "001" =>
         immext <= (31 downto 12 => instr(31)) & instr(31 downto 25) & instr(11 downto 7);
       -- B-type (branches)
-      when "10" =>
+      when "010" =>
         immext <= (31 downto 12 => instr(31)) & instr(7) & instr(30 downto 25) & instr(11 downto 8) & '0';
       -- J-type (jal)
-      when "11" =>
+      when "011" =>
         immext <= (31 downto 20 => instr(31)) & instr(19 downto 12) & instr(20) & instr(30 downto 21) & '0';
+      -- U-type (auipc)
+      when "100" =>
+        immext <= instr(31 downto 12) & "000000000000";
       when others =>
         immext <= (31 downto 0 => '-');
     end case;
@@ -498,19 +511,20 @@ end;
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 
-entity mux3 is -- three-input multiplexer
+entity mux4 is -- three-input multiplexer
   generic(width: integer :=8);
-  port(d0, d1, d2: in  STD_ULOGIC_VECTOR(width-1 downto 0);
+  port(d0, d1, d2, d3: in  STD_ULOGIC_VECTOR(width-1 downto 0);
        s:          in  STD_ULOGIC_VECTOR(1 downto 0);
        y:          out STD_ULOGIC_VECTOR(width-1 downto 0));
 end;
 
-architecture behave of mux3 is
+architecture behave of mux4 is
 begin
-  process(d0, d1, d2, s) begin
+  process(d0, d1, d2, d3, s) begin
     if    (s = "00") then y <= d0;
     elsif (s = "01") then y <= d1;
     elsif (s = "10") then y <= d2;
+    elsif (s = "11") then y <= d3;
     end if;
   end process;
 end;
