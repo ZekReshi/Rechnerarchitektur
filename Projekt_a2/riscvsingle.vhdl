@@ -271,6 +271,7 @@ begin
                        when "010" =>   ALUControl <= "101"; -- slt, slti
                        when "110" =>   ALUControl <= "011"; -- or, ori
                        when "111" =>   ALUControl <= "010"; -- and, andi
+                       when "001" =>   ALUControl <= "110"; -- slli
                        when others =>  ALUControl <= "---"; -- unknown
                      end case;
     end case;
@@ -731,8 +732,9 @@ begin
       when "000" =>  ALUResult_s <= sum;
       when "001" =>  ALUResult_s <= sum;
       when "010" =>  ALUResult_s <= a and b;
-      when "011" =>  ALUResult_s <= a or b;         
+      when "011" =>  ALUResult_s <= a or b;
       when "101" =>  ALUResult_s <= (0 => sum(31), others => '0');
+      when "110" =>  ALUResult_s <= std_logic_vector(shift_left(unsigned(a), to_integer(unsigned(b))));
       when others => ALUResult_s <= (others => 'X');
     end case;
   end process;
