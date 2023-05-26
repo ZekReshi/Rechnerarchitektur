@@ -222,6 +222,7 @@ begin
       when "1100011" => controls <= "01000001010"; -- beq
       when "0010011" => controls <= "10010000100"; -- I-type ALU
       when "1101111" => controls <= "11100100001"; -- jal
+      when "0001011" => controls <= "1---0000110"; -- popcount
       when others    => controls <= "-----------"; -- not valid
     end case;
   end process;
@@ -249,6 +250,7 @@ begin
     case ALUOp is
       when "00" =>                     ALUControl <= "000"; -- addition
       when "01" =>                     ALUControl <= "001"; -- subtraction
+      when "11" =>                     ALUControl <= "110"; -- popcount
       when others => case funct3 is           -- R-type or I-type ALU
                        when "000" => if RtypeSub = '1' then
                                        ALUControl <= "001"; -- sub
@@ -698,13 +700,36 @@ begin
   condinvb <= not b when Alucontrol(0)='1' else b;
   ALUControl_0_tmp <= (0 => ALUControl(0), others => '0');
   sum <= std_logic_vector(unsigned(a) + unsigned(condinvb) + unsigned(ALUControl_0_tmp));
-  process(a,b,ALUControl,sum) begin
+  process(a,b,ALUControl,sum) 
+    variable temp : integer;
+  begin
     case Alucontrol is
       when "000" =>  ALUResult_s <= sum;
       when "001" =>  ALUResult_s <= sum;
       when "010" =>  ALUResult_s <= a and b;
       when "011" =>  ALUResult_s <= a or b;         
       when "101" =>  ALUResult_s <= (0 => sum(31), others => '0');
+      when "110" =>  
+        temp := 0;
+        for i in 31 downto 24 loop
+          if a(i) = '1' then temp := temp+1; end if;
+        end loop;
+        ALUResult_s(31 downto 24) <= std_ulogic_vector(to_signed(temp, 8));
+        temp := 0;
+        for i in 23 downto 16 loop
+          if a(i) = '1' then temp := temp+1; end if;
+        end loop;
+        ALUResult_s(23 downto 16) <= std_ulogic_vector(to_signed(temp, 8));
+        temp := 0;
+        for i in 15 downto 8 loop
+          if a(i) = '1' then temp := temp+1; end if;
+        end loop;
+        ALUResult_s(15 downto 8) <= std_ulogic_vector(to_signed(temp, 8));
+        temp := 0;
+        for i in 7 downto 0 loop
+          if a(i) = '1' then temp := temp+1; end if;
+        end loop;
+        ALUResult_s(7 downto 0) <= std_ulogic_vector(to_signed(temp, 8));
       when others => ALUResult_s <= (others => 'X');
     end case;
   end process;
